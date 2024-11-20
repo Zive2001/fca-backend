@@ -1,0 +1,23 @@
+# Node.js modules
+node_modules/
+
+# Logs
+*.log
+
+# Dependency directories
+npm-debug.log*
+
+# Build and temporary files
+build/
+dist/
+
+# .env files (you may want to keep your environment variables secret)
+.env
+
+# IDE and editor files (e.g., VSCode, JetBrains)
+.vscode/
+.idea/
+
+# Operating system files (e.g., macOS, Windows)
+.DS_Store
+Thumbs.db
