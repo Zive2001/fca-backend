@@ -9,7 +9,7 @@ const dbConfig = {
     server: process.env.DB_SERVER,
     database: process.env.DB_NAME,
     options: {
-        encrypt: false, // For Azure SQL
+        encrypt: false, // change krnna
         enableArithAbort: true,
     },
 };
