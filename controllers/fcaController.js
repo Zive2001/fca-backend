@@ -11,20 +11,37 @@ const getPlants = async (req, res) => {
     }
 };
 
-// Get POs for a selected plant
-const getPOs = async (req, res) => {
+//add this to the insert query after adding a coulmn
+
+const getModules = async (req, res) => {
     const { plant } = req.params;
     try {
         const pool = await connectDB();
         const result = await pool
             .request()
             .input("plant", sql.NVarChar, plant)
-            .query("SELECT DISTINCT Sewing_Order FROM PoData WHERE Production_Section = @plant");
+            .query("SELECT DISTINCT Sewing_work_center FROM PoData WHERE Production_Section = @plant");
         res.status(200).json(result.recordset);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
+
+// Get POs for a selected plant
+const getPOs = async (req, res) => {
+    const { module } = req.params;
+    try {
+        const pool = await connectDB();
+        const result = await pool
+            .request()
+            .input("module", sql.NVarChar, module)
+            .query("SELECT DISTINCT Sewing_Order FROM PoData WHERE Sewing_work_center = @module");
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 
 // Get sizes for a selected PO
 const getSizes = async (req, res) => {
@@ -69,12 +86,13 @@ const getDefectCodes = async (req, res) => {
 
 // Submit FCA data
 const addFCAData = async (req, res) => {
-    const { plant, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks } = req.body;
+    const { plant,module, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks } = req.body;
 
     try {
         const pool = await connectDB();
         await pool.request()
             .input("plant", sql.NVarChar, plant)
+            .input("module", sql.NVarChar, module)
             .input("shift", sql.NVarChar, shift)
             .input("po", sql.NVarChar, po)
             .input("size", sql.NVarChar, size)
@@ -86,8 +104,8 @@ const addFCAData = async (req, res) => {
             .input("defectRate", sql.Float, defectRate)
             .input("photoLinks", sql.NVarChar, photoLinks)
             .query(`
-                INSERT INTO FCA_Audit (Plant, Shift, PO, Size, InspectedQuantity, DefectQuantity, DefectCategory, DefectCode, Status, DefectRate, PhotoLinks)
-                VALUES (@plant, @shift, @po, @size, @inspectedQuantity, @defectQuantity, @defectCategory, @defectCode, @status, @defectRate, @photoLinks)
+                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, InspectedQuantity, DefectQuantity, DefectCategory, DefectCode, Status, DefectRate, PhotoLinks)
+                VALUES (@plant, @module, @shift, @po, @size, @inspectedQuantity, @defectQuantity, @defectCategory, @defectCode, @status, @defectRate, @photoLinks)
             `);
         res.status(201).json({ message: "FCA data submitted successfully." });
     } catch (error) {
@@ -95,4 +113,4 @@ const addFCAData = async (req, res) => {
     }
 };
 
-module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData };
+module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules };
