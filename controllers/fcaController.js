@@ -117,20 +117,22 @@ const addFCAData = async (req, res) => {
 
 // Fetch all FCA data with optional filters
 const getFCAData = async (req, res) => {
-    const { plant, module, shift, po, size, page = 1, limit = 10 } = req.query; // Pagination parameters
+    const { plant, module, shift, po, size, status, date, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
     try {
         const pool = await connectDB();
         const query = `
-            SELECT * 
-            FROM FCA_Audit 
+            SELECT *
+            FROM FCA_Audit
             WHERE 
                 (@plant IS NULL OR Plant = @plant) AND
                 (@module IS NULL OR Module = @module) AND
                 (@shift IS NULL OR Shift = @shift) AND
                 (@po IS NULL OR PO = @po) AND
-                (@size IS NULL OR Size = @size)
+                (@size IS NULL OR Size = @size) AND
+                (@status IS NULL OR Status = @status) AND
+                (@date IS NULL OR CONVERT(date, SubmissionDate) = @date)
             ORDER BY Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
         `;
         const result = await pool.request()
@@ -139,6 +141,8 @@ const getFCAData = async (req, res) => {
             .input("shift", sql.NVarChar, shift || null)
             .input("po", sql.NVarChar, po || null)
             .input("size", sql.NVarChar, size || null)
+            .input("status", sql.NVarChar, status || null)
+            .input("date", sql.Date, date || null)
             .input("offset", sql.Int, offset)
             .input("limit", sql.Int, parseInt(limit))
             .query(query);
@@ -148,6 +152,8 @@ const getFCAData = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
 
 
 // Update FCA data
