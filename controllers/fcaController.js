@@ -11,7 +11,8 @@ const getPlants = async (req, res) => {
     }
 };
 
-// Get modules for a selected plant
+//add this to the insert query after adding a coulmn
+
 const getModules = async (req, res) => {
     const { plant } = req.params;
     try {
@@ -26,7 +27,7 @@ const getModules = async (req, res) => {
     }
 };
 
-// Get POs for a selected module
+// Get POs for a selected plant
 const getPOs = async (req, res) => {
     const { module } = req.params;
     try {
@@ -40,6 +41,7 @@ const getPOs = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
 
 // Get sizes for a selected PO
 const getSizes = async (req, res) => {
@@ -84,7 +86,7 @@ const getDefectCodes = async (req, res) => {
 
 // Submit FCA data
 const addFCAData = async (req, res) => {
-    const { plant, module, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks, remarks, type } = req.body;
+    const { plant,module, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks,remarks, type } = req.body;
 
     try {
         const pool = await connectDB();
@@ -113,9 +115,9 @@ const addFCAData = async (req, res) => {
     }
 };
 
-// Fetch FCA data with filters
+// Fetch all FCA data with optional filters
 const getFCAData = async (req, res) => {
-    const { plant, module, shift, po, size, status, date, type, page = 1, limit = 10 } = req.query;
+    const { plant, module, shift, po, size, status, date, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
     try {
@@ -130,8 +132,7 @@ const getFCAData = async (req, res) => {
                 (@po IS NULL OR PO = @po) AND
                 (@size IS NULL OR Size = @size) AND
                 (@status IS NULL OR Status = @status) AND
-                (@date IS NULL OR CONVERT(date, SubmissionDate) = @date) AND
-                (@type IS NULL OR Type = @type)
+                (@date IS NULL OR CONVERT(date, SubmissionDate) = @date)
             ORDER BY Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
         `;
         const result = await pool.request()
@@ -142,7 +143,6 @@ const getFCAData = async (req, res) => {
             .input("size", sql.NVarChar, size || null)
             .input("status", sql.NVarChar, status || null)
             .input("date", sql.Date, date || null)
-            .input("type", sql.NVarChar, type || null)
             .input("offset", sql.Int, offset)
             .input("limit", sql.Int, parseInt(limit))
             .query(query);
@@ -153,9 +153,12 @@ const getFCAData = async (req, res) => {
     }
 };
 
+
+
+
 // Update FCA data
 const updateFCAData = async (req, res) => {
-    const { id } = req.params;
+    const { id } = req.params; // Record ID to update
     const { plant, module, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks, remarks, type } = req.body;
 
     try {
@@ -218,15 +221,14 @@ const deleteFCAData = async (req, res) => {
     }
 };
 
-module.exports = {
-    getPlants,
-    getModules,
-    getPOs,
-    getSizes,
-    getDefectCategories,
-    getDefectCodes,
-    addFCAData,
-    getFCAData,
-    updateFCAData,
-    deleteFCAData,
-};
+
+
+
+
+
+
+
+
+
+
+module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData };
