@@ -27,7 +27,7 @@ const getModules = async (req, res) => {
     }
 };
 
-// Get POs for a selected plant
+// Get POs for a selected plant and module
 const getPOs = async (req, res) => {
     const { module } = req.params;
     try {
@@ -58,6 +58,42 @@ const getSizes = async (req, res) => {
     }
 };
 
+const getStyles = async (req, res) => {
+    const { po } = req.params;
+    try {
+        const pool = await connectDB();
+        const result = await pool
+            .request()
+            .input("po", sql.NVarChar, po)
+            .query("SELECT DISTINCT Customer_Style FROM PoData WHERE Sewing_Order = @po");
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const getCustomers = async (req, res) => {
+    const { po } = req.params;
+    try {
+        const pool = await connectDB();
+        const result = await pool
+            .request()
+            .input("po", sql.NVarChar, po)
+            .query("SELECT DISTINCT BPL_Customer_Code FROM PoData WHERE Sewing_Order = @po");
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+
+
+
+
+
+
+
 // Get defect categories
 const getDefectCategories = async (req, res) => {
     try {
@@ -86,7 +122,7 @@ const getDefectCodes = async (req, res) => {
 
 // Submit FCA data
 const addFCAData = async (req, res) => {
-    const { plant,module, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks,remarks, type } = req.body;
+    const { plant,module, shift, po, size, customer, style, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks,remarks, type } = req.body;
 
     try {
         const pool = await connectDB();
@@ -96,6 +132,9 @@ const addFCAData = async (req, res) => {
             .input("shift", sql.NVarChar, shift)
             .input("po", sql.NVarChar, po)
             .input("size", sql.NVarChar, size)
+            .input("style", sql.NVarChar, style)
+            .input("size", sql.NVarChar, customer)
+
             .input("inspectedQuantity", sql.Int, inspectedQuantity)
             .input("defectQuantity", sql.Int, defectQuantity)
             .input("remarks", sql.NVarChar, remarks)
@@ -106,8 +145,8 @@ const addFCAData = async (req, res) => {
             .input("photoLinks", sql.NVarChar, photoLinks)
             .input("type", sql.NVarChar, type)
             .query(`
-                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, InspectedQuantity, DefectQuantity, DefectCategory, DefectCode, Status, DefectRate, PhotoLinks, Remarks, Type)
-                VALUES (@plant, @module, @shift, @po, @size, @inspectedQuantity, @defectQuantity, @defectCategory, @defectCode, @status, @defectRate, @photoLinks, @remarks, @type)
+                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, DefectCategory, DefectCode, Status, DefectRate, PhotoLinks, Remarks, Type)
+                VALUES (@plant, @module, @shift, @po, @size, @style, @customer, @inspectedQuantity, @defectQuantity, @defectCategory, @defectCode, @status, @defectRate, @photoLinks, @remarks, @type)
             `);
         res.status(201).json({ message: "FCA data submitted successfully." });
     } catch (error) {
@@ -159,7 +198,7 @@ const getFCAData = async (req, res) => {
 // Update FCA data
 const updateFCAData = async (req, res) => {
     const { id } = req.params; // Record ID to update
-    const { plant, module, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks, remarks, type } = req.body;
+    const { plant, module, shift, po, size, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks, remarks, type, style, customer } = req.body;
 
     try {
         const pool = await connectDB();
@@ -170,6 +209,9 @@ const updateFCAData = async (req, res) => {
             .input("shift", sql.NVarChar, shift)
             .input("po", sql.NVarChar, po)
             .input("size", sql.NVarChar, size)
+            .input("style", sql.NVarChar, style)
+            .input("customer", sql.NVarChar, customer)
+
             .input("inspectedQuantity", sql.Int, inspectedQuantity)
             .input("defectQuantity", sql.Int, defectQuantity)
             .input("defectCategory", sql.NVarChar, defectCategory)
@@ -186,7 +228,9 @@ const updateFCAData = async (req, res) => {
                     Module = @module, 
                     Shift = @shift, 
                     PO = @po, 
-                    Size = @size, 
+                    Size = @size,
+                    Customer = @customer,
+                    Style = @style, 
                     InspectedQuantity = @inspectedQuantity, 
                     DefectQuantity = @defectQuantity, 
                     DefectCategory = @defectCategory, 
@@ -231,4 +275,4 @@ const deleteFCAData = async (req, res) => {
 
 
 
-module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData };
+module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles };
