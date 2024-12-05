@@ -133,7 +133,7 @@ const addFCAData = async (req, res) => {
             .input("po", sql.NVarChar, po)
             .input("size", sql.NVarChar, size)
             .input("style", sql.NVarChar, style)
-            .input("size", sql.NVarChar, customer)
+            .input("customer", sql.NVarChar, customer)
 
             .input("inspectedQuantity", sql.Int, inspectedQuantity)
             .input("defectQuantity", sql.Int, defectQuantity)
@@ -146,7 +146,7 @@ const addFCAData = async (req, res) => {
             .input("type", sql.NVarChar, type)
             .query(`
                 INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, DefectCategory, DefectCode, Status, DefectRate, PhotoLinks, Remarks, Type)
-                VALUES (@plant, @module, @shift, @po, @size, @style, @customer, @inspectedQuantity, @defectQuantity, @defectCategory, @defectCode, @status, @defectRate, @photoLinks, @remarks, @type)
+                VALUES (@plant, @module, @shift, @po, @size, @customer, @style,@inspectedQuantity, @defectQuantity, @defectCategory, @defectCode, @status, @defectRate, @photoLinks, @remarks, @type)
             `);
         res.status(201).json({ message: "FCA data submitted successfully." });
     } catch (error) {
