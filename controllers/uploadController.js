@@ -1,23 +1,49 @@
 const multer = require("multer");
 const xlsx = require("xlsx");
-const poolPromise = require("../db"); // Assuming you already have a DB connection setup like in your existing project
+const fs = require("fs");
+const { connectDB } = require("../db/dbConfig"); // Ensure correct path to dbconfig
 
 // Configure Multer for file uploads
 const upload = multer({ dest: "uploads/" });
 
+// Mapping function for column headers
+const normalizeHeaders = {
+    "Sewing work center": "Sewing_work_center",
+    "Production Section": "Production_Section",
+    "Season": "Season",
+    "BPL Customer Code": "BPL_Customer_Code",
+    "CPO Number": "CPO_Number",
+    "Customer Style": "Customer_Style",
+    "Sales order": "Sales_order",
+    "Item": "Item",
+    "Sewing Order": "Sewing_Order",
+    "Customer Color": "Customer_Color",
+    "Size": "Size",
+};
+
 // Upload Excel and insert into DB
 const uploadExcel = async (req, res) => {
+    const filePath = req.file.path; // Get the uploaded file's path
+
     try {
-        const filePath = req.file.path; // Get the uploaded file's path
         const workbook = xlsx.readFile(filePath);
         const sheetName = workbook.SheetNames[0]; // Read the first sheet
-        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        const rawData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
-        const pool = await poolPromise;
+        // Normalize headers
+        const headers = rawData[0].map(header => normalizeHeaders[header.trim()] || header.trim());
+        const data = rawData.slice(1).map(row =>
+            row.reduce((obj, value, index) => {
+                obj[headers[index]] = value;
+                return obj;
+            }, {})
+        );
+
+        const pool = await connectDB(); // Connect to database
 
         for (let row of data) {
             const query = `
-                INSERT INTO YourTableName (Sewing_work_center, Production_Section, Season, BPL_Customer_Code, CPO_Number, Customer_Style, Sales_order, Item, Sewing_Order, Customer_Color, Size)
+                INSERT INTO PoData (Sewing_work_center, Production_Section, Season, BPL_Customer_Code, CPO_Number, Customer_Style, Sales_order, Item, Sewing_Order, Customer_Color, Size)
                 VALUES (@Sewing_work_center, @Production_Section, @Season, @BPL_Customer_Code, @CPO_Number, @Customer_Style, @Sales_order, @Item, @Sewing_Order, @Customer_Color, @Size)
             `;
             await pool.request()
@@ -35,10 +61,24 @@ const uploadExcel = async (req, res) => {
                 .query(query);
         }
 
+        // Delete the file after successful processing
+        fs.unlink(filePath, (err) => {
+            if (err) {
+                console.error("Error deleting file:", err);
+            }
+        });
+
         res.status(200).send("File uploaded and data inserted successfully!");
     } catch (error) {
         console.error(error);
         res.status(500).send("Error processing file");
+    } finally {
+        // Ensure file is deleted in case of errors
+        fs.unlink(filePath, (err) => {
+            if (err) {
+                console.error("Error deleting file in finally block:", err);
+            }
+        });
     }
 };
 
