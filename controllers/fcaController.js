@@ -11,7 +11,7 @@ const getPlants = async (req, res) => {
     }
 };
 
-//add this to the insert query after adding a coulmn
+
 
 const getModules = async (req, res) => {
     const { plant } = req.params;
@@ -122,39 +122,64 @@ const getDefectCodes = async (req, res) => {
 
 // Submit FCA data
 const addFCAData = async (req, res) => {
-    const { plant,module, shift, po, size, customer, style, inspectedQuantity, defectQuantity, defectCategory, defectCode, status, defectRate, photoLinks,remarks, type } = req.body;
+    const {
+        plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
+        defectDetails, // Array of {defectCategory, defectCode}
+        status, defectRate, photoLinks, remarks, type
+    } = req.body;
+
+    const pool = await connectDB();
+    const transaction = pool.transaction();
 
     try {
-        const pool = await connectDB();
-        await pool.request()
+        await transaction.begin();
+
+        // Insert into FCA_Audit table
+        const result = await transaction.request()
             .input("plant", sql.NVarChar, plant)
             .input("module", sql.NVarChar, module)
             .input("shift", sql.NVarChar, shift)
             .input("po", sql.NVarChar, po)
             .input("size", sql.NVarChar, size)
-            .input("style", sql.NVarChar, style)
             .input("customer", sql.NVarChar, customer)
-
+            .input("style", sql.NVarChar, style)
             .input("inspectedQuantity", sql.Int, inspectedQuantity)
             .input("defectQuantity", sql.Int, defectQuantity)
-            .input("remarks", sql.NVarChar, remarks)
-            .input("defectCategory", sql.NVarChar, defectCategory)
-            .input("defectCode", sql.NVarChar, defectCode)
             .input("status", sql.NVarChar, status)
             .input("defectRate", sql.Float, defectRate)
             .input("photoLinks", sql.NVarChar, photoLinks)
+            .input("remarks", sql.NVarChar, remarks)
             .input("type", sql.NVarChar, type)
             .query(`
-                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, DefectCategory, DefectCode, Status, DefectRate, PhotoLinks, Remarks, Type)
-                VALUES (@plant, @module, @shift, @po, @size, @customer, @style,@inspectedQuantity, @defectQuantity, @defectCategory, @defectCode, @status, @defectRate, @photoLinks, @remarks, @type)
+                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, Status, DefectRate, PhotoLinks, Remarks, Type)
+                OUTPUT INSERTED.Id
+                VALUES (@plant, @module, @shift, @po, @size, @customer, @style, @inspectedQuantity, @defectQuantity, @status, @defectRate, @photoLinks, @remarks, @type)
             `);
+
+        const auditId = result.recordset[0].Id;
+
+        // Insert defect details into FCA_Defects table
+        for (const defect of defectDetails) {
+            await transaction.request()
+                .input("FCA_AuditId", sql.Int, auditId)
+                .input("defectCategory", sql.NVarChar, defect.defectCategory)
+                .input("defectCode", sql.NVarChar, defect.defectCode)
+                .query(`
+                    INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode)
+                    VALUES (@FCA_AuditId, @defectCategory, @defectCode)
+                `);
+        }
+
+        await transaction.commit();
         res.status(201).json({ message: "FCA data submitted successfully." });
     } catch (error) {
+        await transaction.rollback();
         res.status(500).json({ error: error.message });
     }
 };
 
-// Fetch all FCA data with optional filters
+//get all FCA data
+
 const getFCAData = async (req, res) => {
     const { plant, module, shift, po, size, status, date, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
@@ -162,18 +187,22 @@ const getFCAData = async (req, res) => {
     try {
         const pool = await connectDB();
         const query = `
-            SELECT *
-            FROM FCA_Audit
+            SELECT 
+                A.*, 
+                D.Id AS DefectId, D.DefectCategory, D.DefectCode
+            FROM FCA_Audit A
+            LEFT JOIN FCA_Defects D ON A.Id = D.FCA_AuditId
             WHERE 
-                (@plant IS NULL OR Plant = @plant) AND
-                (@module IS NULL OR Module = @module) AND
-                (@shift IS NULL OR Shift = @shift) AND
-                (@po IS NULL OR PO = @po) AND
-                (@size IS NULL OR Size = @size) AND
-                (@status IS NULL OR Status = @status) AND
-                (@date IS NULL OR CONVERT(date, SubmissionDate) = @date)
-            ORDER BY Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
+                (@plant IS NULL OR A.Plant = @plant) AND
+                (@module IS NULL OR A.Module = @module) AND
+                (@shift IS NULL OR A.Shift = @shift) AND
+                (@po IS NULL OR A.PO = @po) AND
+                (@size IS NULL OR A.Size = @size) AND
+                (@status IS NULL OR A.Status = @status) AND
+                (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date)
+            ORDER BY A.Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
         `;
+
         const result = await pool.request()
             .input("plant", sql.NVarChar, plant || null)
             .input("module", sql.NVarChar, module || null)
@@ -186,7 +215,22 @@ const getFCAData = async (req, res) => {
             .input("limit", sql.Int, parseInt(limit))
             .query(query);
 
-        res.status(200).json(result.recordset);
+        // Group results by FCA_AuditId
+        const groupedResults = result.recordset.reduce((acc, row) => {
+            if (!acc[row.Id]) {
+                acc[row.Id] = { ...row, defects: [] };
+            }
+            if (row.DefectCategory && row.DefectCode) {
+                acc[row.Id].defects.push({
+                    defectId: row.DefectId,
+                    defectCategory: row.DefectCategory,
+                    defectCode: row.DefectCode
+                });
+            }
+            return acc;
+        }, {});
+
+        res.status(200).json(Object.values(groupedResults));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -211,7 +255,6 @@ const updateFCAData = async (req, res) => {
             .input("size", sql.NVarChar, size)
             .input("style", sql.NVarChar, style)
             .input("customer", sql.NVarChar, customer)
-
             .input("inspectedQuantity", sql.Int, inspectedQuantity)
             .input("defectQuantity", sql.Int, defectQuantity)
             .input("defectCategory", sql.NVarChar, defectCategory)
@@ -264,12 +307,6 @@ const deleteFCAData = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
-
-
-
-
-
-
 
 
 
