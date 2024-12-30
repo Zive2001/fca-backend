@@ -12,6 +12,7 @@ router.get("/styles/:po", getStyles);
 router.get("/defect-categories", getDefectCategories); 
 router.get("/defect-codes/:category", getDefectCodes); 
 
+
 router.post("/submit", addFCAData);
 
 
