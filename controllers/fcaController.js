@@ -163,11 +163,11 @@ const getDefectCodes = async (req, res) => {
 };
 
 // Submit FCA data
+// In the second document where addFCAData is defined
 const addFCAData = async (req, res) => {
     const {
         plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
-        defectDetails, // Array of {defectCategory, defectCode, quantity}
-        status, defectRate, photoLinks, remarks, type
+        defectDetails, status, defectRate, photoLinks, remarks, type
     } = req.body;
 
     const pool = await connectDB();
@@ -201,19 +201,31 @@ const addFCAData = async (req, res) => {
         const auditId = result.recordset[0].Id;
 
         // Batch insert defect details
-        const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity }) => 
-            `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity})`
-        ).join(",");
+        if (defectDetails && defectDetails.length > 0) {
+            const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity }) => 
+                `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity})`
+            ).join(",");
 
-        if (defectValues) {
-            await transaction.request().query(`
+            const defectsResult = await transaction.request().query(`
                 INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode, Quantity)
+                OUTPUT INSERTED.Id, INSERTED.DefectCategory, INSERTED.DefectCode
                 VALUES ${defectValues}
             `);
-        }
 
-        await transaction.commit();
-        res.status(201).json({ message: "FCA data submitted successfully." });
+            await transaction.commit();
+            res.status(201).json({ 
+                message: "FCA data submitted successfully.",
+                auditId: auditId,
+                defects: defectsResult.recordset
+            });
+        } else {
+            await transaction.commit();
+            res.status(201).json({ 
+                message: "FCA data submitted successfully.",
+                auditId: auditId,
+                defects: []
+            });
+        }
     } catch (error) {
         await transaction.rollback();
         res.status(500).json({ error: error.message });
