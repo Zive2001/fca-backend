@@ -131,11 +131,6 @@ const getCustomers = async (req, res) => {
 
 
 
-
-
-
-
-
 // Get defect categories
 const getDefectCategories = async (req, res) => {
     try {
@@ -161,6 +156,32 @@ const getDefectCodes = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+const getLocationCategory = async (req, res) => {
+    try {
+        const pool = await connectDB();
+        const result = await pool.request().query("SELECT DISTINCT Category FROM Defect_Locations");
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const getDefectLocaition = async (req, res) => {
+    const { category } = req.params;
+    try {
+        const pool = await connectDB();
+        const result = await pool
+            .request()
+            .input("category", sql.NVarChar, category)
+            .query("SELECT Combined_Defect FROM Defect_Location WHERE Category = @category");
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
 
 // Submit FCA data
 // In the second document where addFCAData is defined
