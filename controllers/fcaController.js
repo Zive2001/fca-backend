@@ -129,6 +129,56 @@ const getCustomers = async (req, res) => {
     }
 };
 
+const getCustomerColor = async (req, res) => {
+    const { po } = req.params;
+    try {
+        const pool = await connectDB();
+        const result = await pool
+            .request()
+            .input("po", sql.NVarChar, po)
+            .query(`
+                SELECT DISTINCT 
+                    Customer_Color
+                FROM PoData 
+                WHERE Sewing_Order = @po
+            `);
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ message: "No colour found for this PO" });
+        }
+
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        console.error("Error in getCustomerColor:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const getCustomerColorDesc = async (req, res) => {
+    const { po } = req.params;
+    try {
+        const pool = await connectDB();
+        const result = await pool
+            .request()
+            .input("po", sql.NVarChar, po)
+            .query(`
+                SELECT DISTINCT 
+                    Customer_Color_Descr
+                FROM PoData 
+                WHERE Sewing_Order = @po
+            `);
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ message: "No colour description found for this PO" });
+        }
+
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        console.error("Error in getCustomerColorDesc:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 
 
 // Get defect categories
@@ -188,7 +238,7 @@ const getDefectLocaition = async (req, res) => {
 const addFCAData = async (req, res) => {
     const {
         plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
-        defectDetails, status, defectRate, photoLinks, remarks, type
+        defectDetails, status, defectRate, remarks, type,color,colorDesc
     } = req.body;
 
     const pool = await connectDB();
@@ -210,25 +260,26 @@ const addFCAData = async (req, res) => {
             .input("defectQuantity", sql.Int, defectQuantity)
             .input("status", sql.NVarChar, status)
             .input("defectRate", sql.Float, defectRate)
-            .input("photoLinks", sql.NVarChar, photoLinks)
+            .input("color", sql.NVarChar, color)
+            .input("colorDesc", sql.NVarChar, colorDesc)
             .input("remarks", sql.NVarChar, remarks)
             .input("type", sql.NVarChar, type)
             .query(`
-                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, Status, DefectRate, PhotoLinks, Remarks, Type)
+                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, Status, DefectRate, Remarks, Type,Customer_Color,Customer_Color_Descr)
                 OUTPUT INSERTED.Id
-                VALUES (@plant, @module, @shift, @po, @size, @customer, @style, @inspectedQuantity, @defectQuantity, @status, @defectRate, @photoLinks, @remarks, @type)
+                VALUES (@plant, @module, @shift, @po, @size, @customer, @style, @inspectedQuantity, @defectQuantity, @status, @defectRate, @remarks, @type,@color,@colorDesc)
             `);
 
         const auditId = result.recordset[0].Id;
 
         // Batch insert defect details
         if (defectDetails && defectDetails.length > 0) {
-            const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity,locationCategory, defectLocation}) => 
-                `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity},'${locationCategory}', '${defectLocation}')`
+            const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity, locationCategory, defectLocation}) => 
+                `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity}, '${locationCategory}', '${defectLocation}')`
             ).join(",");
-
+            
             const defectsResult = await transaction.request().query(`
-                INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode, Quantity LocationCategoy,DefectLocation)
+                INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode, Quantity, LocationCategory, DefectLocation)
                 OUTPUT INSERTED.Id, INSERTED.DefectCategory, INSERTED.DefectCode
                 VALUES ${defectValues}
             `);
@@ -343,7 +394,7 @@ const updateFCAData = async (req, res) => {
     const { id } = req.params; // Record ID to update
     const {
         plant, module, shift, po, size, inspectedQuantity, defectQuantity, defects, // Array of {defectCategory, defectCode, quantity}
-        status, defectRate, photoLinks, remarks, type, style, customer
+        status, defectRate, remarks, type, style, customer
     } = req.body;
 
     const pool = await connectDB();
@@ -366,7 +417,7 @@ const updateFCAData = async (req, res) => {
             .input("defectQuantity", sql.Int, defectQuantity)
             .input("status", sql.NVarChar, status)
             .input("defectRate", sql.Float, defectRate)
-            .input("photoLinks", sql.NVarChar, photoLinks)
+           
             .input("remarks", sql.NVarChar, remarks)
             .input("type", sql.NVarChar, type)
             .query(`
@@ -383,7 +434,7 @@ const updateFCAData = async (req, res) => {
                     DefectQuantity = @defectQuantity, 
                     Status = @status, 
                     DefectRate = @defectRate, 
-                    PhotoLinks = @photoLinks, 
+                   
                     Remarks = @remarks, 
                     Type = @type
                 WHERE Id = @id
@@ -447,4 +498,4 @@ const deleteFCAData = async (req, res) => {
 
 
 
-module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles, getDefectLocaition, getLocationCategory };
+module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles, getDefectLocaition, getLocationCategory,getCustomerColor,getCustomerColorDesc,getCustomerColorDesc };

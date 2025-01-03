@@ -19,6 +19,7 @@ const normalizeHeaders = {
     "Sewing Order": "Sewing_Order",
     "Customer Color": "Customer_Color",
     "Size": "Size",
+    "Customer Color Descr": "Customer_Color_Descr"
 };
 
 // Upload Excel and insert into DB
@@ -43,8 +44,8 @@ const uploadExcel = async (req, res) => {
 
         for (let row of data) {
             const query = `
-                INSERT INTO PoData (Sewing_work_center, Production_Section, Season, BPL_Customer_Code, CPO_Number, Customer_Style, Sales_order, Item, Sewing_Order, Customer_Color, Size)
-                VALUES (@Sewing_work_center, @Production_Section, @Season, @BPL_Customer_Code, @CPO_Number, @Customer_Style, @Sales_order, @Item, @Sewing_Order, @Customer_Color, @Size)
+                INSERT INTO PoData (Sewing_work_center, Production_Section, Season, BPL_Customer_Code, CPO_Number, Customer_Style, Sales_order, Item, Sewing_Order, Customer_Color, Size, Customer_Color_Descr)
+    VALUES (@Sewing_work_center, @Production_Section, @Season, @BPL_Customer_Code, @CPO_Number, @Customer_Style, @Sales_order, @Item, @Sewing_Order, @Customer_Color, @Size, @Customer_Color_Descr)
             `;
             await pool.request()
                 .input("Sewing_work_center", row.Sewing_work_center || null)
@@ -58,6 +59,7 @@ const uploadExcel = async (req, res) => {
                 .input("Sewing_Order", row.Sewing_Order || null)
                 .input("Customer_Color", row.Customer_Color || null)
                 .input("Size", row.Size || null)
+                .input("Customer_Color_Descr", row.Customer_Color_Descr || null)
                 .query(query);
         }
 
