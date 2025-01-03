@@ -174,7 +174,7 @@ const getDefectLocaition = async (req, res) => {
         const result = await pool
             .request()
             .input("category", sql.NVarChar, category)
-            .query("SELECT Combined_Defect FROM Defect_Location WHERE Category = @category");
+            .query("SELECT Defect_Location FROM Defect_Locations WHERE Category = @category");
         res.status(200).json(result.recordset);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -223,12 +223,12 @@ const addFCAData = async (req, res) => {
 
         // Batch insert defect details
         if (defectDetails && defectDetails.length > 0) {
-            const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity }) => 
-                `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity})`
+            const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity,locationCategory, defectLocation}) => 
+                `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity},'${locationCategory}', '${defectLocation}')`
             ).join(",");
 
             const defectsResult = await transaction.request().query(`
-                INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode, Quantity)
+                INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode, Quantity LocationCategoy,DefectLocation)
                 OUTPUT INSERTED.Id, INSERTED.DefectCategory, INSERTED.DefectCode
                 VALUES ${defectValues}
             `);
@@ -447,4 +447,4 @@ const deleteFCAData = async (req, res) => {
 
 
 
-module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles };
+module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles, getDefectLocaition, getLocationCategory };

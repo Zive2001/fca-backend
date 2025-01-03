@@ -1,5 +1,5 @@
 const express = require("express");
-const { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes,getModules,getCustomers,getStyles, addFCAData, getFCAData, updateFCAData, deleteFCAData } = require("../controllers/fcaController");
+const { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes,getModules,getCustomers,getStyles, addFCAData, getFCAData, updateFCAData, deleteFCAData, getDefectLocaition,getLocationCategory} = require("../controllers/fcaController");
 const router = express.Router();
 
 
@@ -11,6 +11,8 @@ router.get("/customers/:po", getCustomers);
 router.get("/styles/:po", getStyles);         
 router.get("/defect-categories", getDefectCategories); 
 router.get("/defect-codes/:category", getDefectCodes); 
+router.get("/location-categories", getLocationCategory);
+router.get("/defect-locations/:category", getDefectLocaition);
 
 
 router.post("/submit", addFCAData);
