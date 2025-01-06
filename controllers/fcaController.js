@@ -238,7 +238,7 @@ const getDefectLocaition = async (req, res) => {
 const addFCAData = async (req, res) => {
     const {
         plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
-        defectDetails, status, defectRate, remarks, type,color,colorDesc
+        defectDetails, status, defectRate, remarks, type, color, colorDesc
     } = req.body;
 
     const pool = await connectDB();
@@ -265,45 +265,55 @@ const addFCAData = async (req, res) => {
             .input("remarks", sql.NVarChar, remarks)
             .input("type", sql.NVarChar, type)
             .query(`
-                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, Status, DefectRate, Remarks, Type,Customer_Color,Customer_Color_Descr)
+                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, Status, DefectRate, Remarks, Type, Customer_Color, Customer_Color_Descr)
                 OUTPUT INSERTED.Id
-                VALUES (@plant, @module, @shift, @po, @size, @customer, @style, @inspectedQuantity, @defectQuantity, @status, @defectRate, @remarks, @type,@color,@colorDesc)
+                VALUES (@plant, @module, @shift, @po, @size, @customer, @style, @inspectedQuantity, @defectQuantity, @status, @defectRate, @remarks, @type, @color, @colorDesc)
             `);
 
         const auditId = result.recordset[0].Id;
 
-        // Batch insert defect details
+        // Modified defect details insertion to properly handle location information
         if (defectDetails && defectDetails.length > 0) {
-            const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity, locationCategory, defectLocation}) => 
-                `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity}, '${locationCategory}', '${defectLocation}')`
-            ).join(",");
-            
-            const defectsResult = await transaction.request().query(`
-                INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode, Quantity, LocationCategory, DefectLocation)
-                OUTPUT INSERTED.Id, INSERTED.DefectCategory, INSERTED.DefectCode
-                VALUES ${defectValues}
-            `);
-
-            await transaction.commit();
-            res.status(201).json({ 
-                message: "FCA data submitted successfully.",
-                auditId: auditId,
-                defects: defectsResult.recordset
-            });
-        } else {
-            await transaction.commit();
-            res.status(201).json({ 
-                message: "FCA data submitted successfully.",
-                auditId: auditId,
-                defects: []
-            });
+            for (const defect of defectDetails) {
+                await transaction.request()
+                    .input("auditId", sql.Int, auditId)
+                    .input("defectCategory", sql.NVarChar, defect.defectCategory)
+                    .input("defectCode", sql.NVarChar, defect.defectCode)
+                    .input("quantity", sql.Int, defect.quantity)
+                    .input("locationCategory", sql.NVarChar, defect.locationCategory)
+                    .input("defectLocation", sql.NVarChar, defect.defectLocation)
+                    .query(`
+                        INSERT INTO FCA_Defects (
+                            FCA_AuditId, 
+                            DefectCategory, 
+                            DefectCode, 
+                            Quantity, 
+                            LocationCategory, 
+                            DefectLocation
+                        )
+                        VALUES (
+                            @auditId, 
+                            @defectCategory, 
+                            @defectCode, 
+                            @quantity, 
+                            @locationCategory, 
+                            @defectLocation
+                        )
+                    `);
+            }
         }
+
+        await transaction.commit();
+        res.status(201).json({ 
+            message: "FCA data submitted successfully.",
+            auditId: auditId
+        });
     } catch (error) {
         await transaction.rollback();
+        console.error("Error in addFCAData:", error);
         res.status(500).json({ error: error.message });
     }
 };
-
 
 //get all FCA data
 
