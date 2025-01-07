@@ -272,18 +272,36 @@ const addFCAData = async (req, res) => {
 
         const auditId = result.recordset[0].Id;
 
-        // Batch insert defect details with location information
+        // Modified defect details handling to include location information
         if (defectDetails && defectDetails.length > 0) {
             const defectValues = defectDetails.map(({ defectCategory, defectCode, quantity, locationCategory, defectLocation }) => {
-                // Ensure all values are properly escaped
-                const escapedDefectLocation = defectLocation?.replace(/'/g, "''") || '';
-                const escapedLocationCategory = locationCategory?.replace(/'/g, "''") || '';
-                return `(${auditId}, '${defectCategory}', '${defectCode}', ${quantity}, '${escapedLocationCategory}', '${escapedDefectLocation}')`;
+                // Ensure all values are properly escaped and handle null/undefined values
+                const escapedDefectLocation = defectLocation ? defectLocation.replace(/'/g, "''") : '';
+                const escapedLocationCategory = locationCategory ? locationCategory.replace(/'/g, "''") : '';
+                
+                return `(${auditId}, 
+                        '${defectCategory}', 
+                        '${defectCode}', 
+                        ${quantity}, 
+                        '${escapedLocationCategory}', 
+                        '${escapedDefectLocation}')`;
             }).join(",");
             
             const defectsResult = await transaction.request().query(`
-                INSERT INTO FCA_Defects (FCA_AuditId, DefectCategory, DefectCode, Quantity, LocationCategory, DefectLocation)
-                OUTPUT INSERTED.Id, INSERTED.DefectCategory, INSERTED.DefectCode, INSERTED.LocationCategory, INSERTED.DefectLocation
+                INSERT INTO FCA_Defects (
+                    FCA_AuditId, 
+                    DefectCategory, 
+                    DefectCode, 
+                    Quantity, 
+                    LocationCategory, 
+                    DefectLocation
+                )
+                OUTPUT 
+                    INSERTED.Id, 
+                    INSERTED.DefectCategory, 
+                    INSERTED.DefectCode,
+                    INSERTED.LocationCategory,
+                    INSERTED.DefectLocation
                 VALUES ${defectValues}
             `);
 
