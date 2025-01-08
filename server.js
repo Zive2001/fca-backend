@@ -25,7 +25,7 @@ app.use(cors());
 app.use("/api/fca", fcaRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/fca/photos", photoRoutes);
-app.use("/api/email", emailRoutes); // Changed to match frontend URL
+app.use("/api/fca/email", emailRoutes); // Changed to match frontend URL
 
 // Error handling middleware
 app.use((err, req, res, next) => {
