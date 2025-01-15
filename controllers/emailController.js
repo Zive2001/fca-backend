@@ -71,6 +71,7 @@ const generateEmailBody = (formData, defectEntries) => {
                         <td style="border: 1px solid #ddd; padding: 8px;"><strong>Defect Rate:</strong></td>
                         <td style="border: 1px solid #ddd; padding: 8px;">${formData.defectRate}%</td>
                     </tr>
+                    
                 </table>
 
                 <h3>Defect Details:</h3>
