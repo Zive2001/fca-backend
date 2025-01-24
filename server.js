@@ -10,7 +10,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5002;
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
