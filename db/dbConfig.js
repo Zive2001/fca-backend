@@ -2,16 +2,23 @@ const sql = require("mssql");
 const dotenv = require("dotenv")
 dotenv.config()
 
-
 const dbConfig = {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER,
-    database: process.env.DB_NAME,
+    user: process.env.DB_USER || 'usrfca',
+    password: process.env.DB_PASSWORD || 'uFca*^zvhQH*Ara',
+    server: process.env.DB_SERVER || 'sg-prod-bdydbs1.database.windows.net',
+    database: process.env.DB_NAME || 'SG-PROD-BDYDB-FCA',
     options: {
-        encrypt: false, // change krnna
-        enableArithAbort: true,
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true
     },
+    requestTimeout: 60000,
+    connectionTimeout: 30000,
+    pool: {
+        max: 10,
+        min: 0,
+        idleTimeoutMillis: 30000
+    }
 };
 
 const connectDB = async () => {
