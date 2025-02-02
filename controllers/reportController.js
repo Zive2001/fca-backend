@@ -1,8 +1,11 @@
-// Failure report controller
+// reportController.js
+const { connectDB, sql } = require('../db/dbConfig');
+
 const generateFailureReport = async (req, res) => {
     const { auditId } = req.params;
     
     try {
+        // Create a new connection pool for this request
         const pool = await connectDB();
         
         // Get main audit data
@@ -54,16 +57,17 @@ const generateFailureReport = async (req, res) => {
                 });
             }
             
-            if (record.PhotoId) {
-                const photoBuffer = record.PhotoData;
-                if (photoBuffer) {
-                    const base64Photo = photoBuffer.toString('base64');
+            if (record.PhotoId && record.PhotoData) {
+                try {
+                    const base64Photo = record.PhotoData.toString('base64');
                     defectMap.get(record.Id).photos.push({
                         id: record.PhotoId,
                         name: record.PhotoName,
                         dataUrl: `data:${record.PhotoMimeType};base64,${base64Photo}`,
                         uploadDate: record.UploadDate
                     });
+                } catch (photoError) {
+                    console.error(`Error processing photo for defect ${record.Id}:`, photoError);
                 }
             }
         });
@@ -90,7 +94,10 @@ const generateFailureReport = async (req, res) => {
         res.status(200).json(reportData);
     } catch (error) {
         console.error("Error generating failure report:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

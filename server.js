@@ -11,51 +11,69 @@ const reportRoutes = require("./routes/reportRoutes");
 const dotenv = require("dotenv");
 const { connectDB } = require("./db/dbConfig");
 
-// Startup logging
-console.log("Starting application...");
-console.log("Node version:", process.version);
-console.log("Current directory:", process.cwd());
-
 dotenv.config();
-console.log("Environment variables loaded");
-
-// Log environment variables (excluding sensitive data)
-console.log("PORT:", process.env.PORT);
-console.log("DB_SERVER:", process.env.DB_SERVER);
-console.log("DB_NAME:", process.env.DB_NAME);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
 
-// CORS configuration for Azure
+// Updated CORS configuration
 const corsOptions = {
     origin: [
-        'http://localhost:5173',  // Add your local frontend URL
-        'https://sg-prod-bdyapp-fcafront.azurewebsites.net'  // Keep production URL
+        'http://localhost:5173',
+        'https://sg-prod-bdyapp-fcafront.azurewebsites.net'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'X-Requested-With',
+        'Cache-Control',
+        'Pragma',
+        'Accept',
+        'Origin'
+    ],
+    exposedHeaders: ['Content-Disposition']
 };
-console.log("Setting up middleware...");
 
-// Middleware
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+// Apply CORS before other middleware
 app.use(cors(corsOptions));
 
-console.log("Setting up routes...");
+// Additional headers middleware
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Credentials', true);
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+        return;
+    }
+    next();
+});
+
+// Other middleware
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Routes
 app.use("/api/fca", fcaRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/fca/photos", photoRoutes);
 app.use("/api/fca/email", emailRoutes);
-app.use("/api/fca/reports", reportRoutes); 
+app.use("/api/fca/reports", reportRoutes);
+
 
 // Basic route for testing
 app.get("/", (req, res) => {

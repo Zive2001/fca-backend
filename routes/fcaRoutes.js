@@ -17,7 +17,7 @@ const {
     getCustomerColor, 
     getCustomerColorDesc,
     getCPONumber,         
-    generateFailureReport
+  
 } = require("../controllers/fcaController");
 
 const router = express.Router();
@@ -35,7 +35,7 @@ router.get("/defect-categories", getDefectCategories);
 router.get("/defect-codes/:category", getDefectCodes); 
 router.get("/location-categories", getLocationCategory);
 router.get("/defect-locations/:category", getDefectLocaition);
-router.get("/failure-report/:auditId", generateFailureReport);
+
 
 // Add new route for CPO number
 router.get("/cpo/:po", getCPONumber);

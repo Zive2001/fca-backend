@@ -693,4 +693,4 @@ const deleteFCAData = async (req, res) => {
 
 
 
-module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles, getDefectLocaition, getLocationCategory,getCustomerColor,getCustomerColorDesc,getCustomerColorDesc,getCPONumber,generateFailureReport };
+module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles, getDefectLocaition, getLocationCategory,getCustomerColor,getCustomerColorDesc,getCustomerColorDesc,getCPONumber };
