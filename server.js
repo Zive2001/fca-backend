@@ -7,6 +7,7 @@ const fcaRoutes = require("./routes/fcaRoutes");
 const uploadRoutes = require("./routes/uploadroutes");
 const photoRoutes = require("./routes/photoRoutes");
 const emailRoutes = require("./routes/emailRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 const dotenv = require("dotenv");
 const { connectDB } = require("./db/dbConfig");
 
@@ -33,7 +34,7 @@ const upload = multer({ storage: storage });
 // CORS configuration for Azure
 const corsOptions = {
     origin: [
-        'http://localhost:5174',  // Add your local frontend URL
+        'http://localhost:5173',  // Add your local frontend URL
         'https://sg-prod-bdyapp-fcafront.azurewebsites.net'  // Keep production URL
     ],
     credentials: true,
@@ -54,6 +55,7 @@ app.use("/api/fca", fcaRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/fca/photos", photoRoutes);
 app.use("/api/fca/email", emailRoutes);
+app.use("/api/fca/reports", reportRoutes); 
 
 // Basic route for testing
 app.get("/", (req, res) => {

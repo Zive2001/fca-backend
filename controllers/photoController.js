@@ -14,35 +14,44 @@ const upload = multer({
 // Function to add a photo
 const addDefectPhoto = async (req, res) => {
     upload(req, res, async (err) => {
-        if (err) {
-            console.error('Error uploading file:', err);
-            return res.status(400).json({ error: 'File upload error: ' + err.message });
+        if (err instanceof multer.MulterError) {
+            console.error('Multer error:', err);
+            return res.status(400).json({ 
+                error: 'File upload error',
+                details: err.message 
+            });
+        } else if (err) {
+            console.error('Unknown error:', err);
+            return res.status(500).json({ 
+                error: 'Unknown error occurred during upload',
+                details: err.message 
+            });
+        }
+
+        // Validate request
+        if (!req.file) {
+            return res.status(400).json({ error: 'No photo file provided' });
+        }
+
+        const auditId = parseInt(req.body.auditId);
+        const defectId = parseInt(req.body.defectId);
+
+        if (isNaN(auditId) || isNaN(defectId)) {
+            return res.status(400).json({ error: 'Invalid auditId or defectId' });
         }
 
         try {
-            const auditId = parseInt(req.body.auditId);
-            const defectId = parseInt(req.body.defectId);
-            const file = req.file;
-
-            if (!file) {
-                return res.status(400).json({ error: 'No file uploaded' });
-            }
-
-            if (isNaN(auditId) || isNaN(defectId)) {
-                return res.status(400).json({ error: 'Invalid auditId or defectId' });
-            }
-
             const pool = await connectDB();
             
-            // Convert file buffer to proper format
-            const photoBuffer = Buffer.from(file.buffer);
+            // Convert file buffer to proper format for SQL Server
+            const photoBuffer = Buffer.from(req.file.buffer);
             
             const result = await pool.request()
                 .input('auditId', sql.Int, auditId)
                 .input('defectId', sql.Int, defectId)
-                .input('photoName', sql.NVarChar, file.originalname)
+                .input('photoName', sql.NVarChar, req.file.originalname)
                 .input('photoData', sql.VarBinary(sql.MAX), photoBuffer)
-                .input('mimeType', sql.NVarChar, file.mimetype)
+                .input('mimeType', sql.NVarChar, req.file.mimetype)
                 .query(`
                     INSERT INTO FCA_DefPhoto (
                         FCA_AuditId, 
@@ -66,10 +75,10 @@ const addDefectPhoto = async (req, res) => {
             res.status(201).json({ 
                 id: photoId,
                 message: "Photo uploaded successfully",
-                fileName: file.originalname
+                fileName: req.file.originalname
             });
         } catch (error) {
-            console.error('Error in addDefectPhoto:', error);
+            console.error('Database error in addDefectPhoto:', error);
             res.status(500).json({ 
                 error: 'Database error',
                 details: error.message 
@@ -77,6 +86,7 @@ const addDefectPhoto = async (req, res) => {
         }
     });
 };
+
 
 // Function to get a photo
 const getDefectPhoto = async (req, res) => {
