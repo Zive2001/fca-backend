@@ -261,7 +261,7 @@ const getDefectLocaition = async (req, res) => {
 const addFCAData = async (req, res) => {
     const {
         plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
-        defectDetails, status, defectRate, remarks, type, color, colorDesc, cpoNumber
+        defectDetails, status, defectRate, remarks, type, color, colorDesc, cpoNumber,createdBy
     } = req.body;
 
     const pool = await connectDB();
@@ -269,6 +269,15 @@ const addFCAData = async (req, res) => {
 
     try {
         await transaction.begin();
+        await transaction.request()
+        .input('email', sql.NVarChar, createdBy)
+            .query(`
+                IF NOT EXISTS (SELECT 1 FROM Users WHERE Email = @email)
+                BEGIN
+                    INSERT INTO Users (Email, CreatedAt)
+                    VALUES (@email, GETDATE())
+                END
+            `);
 
         // Insert into FCA_Audit table
         const result = await transaction.request()
@@ -288,17 +297,18 @@ const addFCAData = async (req, res) => {
             .input("remarks", sql.NVarChar, remarks)
             .input("type", sql.NVarChar, type)
             .input("cpoNumber", sql.NVarChar, cpoNumber)
+            .input("createdBy", sql.NVarChar, createdBy)
         .query(`
             INSERT INTO FCA_Audit (
                 Plant, Module, Shift, PO, Size, Customer, Style, 
                 InspectedQuantity, DefectQuantity, Status, DefectRate, 
-                Remarks, Type, Customer_Color, Customer_Color_Descr, CPO_Number
+                Remarks, Type, Customer_Color, Customer_Color_Descr, CPO_Number,CreatedBy, CreatedAt
             )
             OUTPUT INSERTED.Id
             VALUES (
                 @plant, @module, @shift, @po, @size, @customer, @style,
                 @inspectedQuantity, @defectQuantity, @status, @defectRate,
-                @remarks, @type, @color, @colorDesc, @cpoNumber
+                @remarks, @type, @color, @colorDesc, @cpoNumber,@createdBy, GETDATE()
             )
         `);
 
