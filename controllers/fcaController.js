@@ -178,7 +178,30 @@ const getCustomerColorDesc = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+const getCPONumber = async (req, res) => {
+    const { po } = req.params;
+    try {
+        const pool = await connectDB();
+        const result = await pool
+            .request()
+            .input("po", sql.NVarChar, po)
+            .query(`
+                SELECT DISTINCT 
+                    CPO_Number
+                FROM PoData 
+                WHERE Sewing_Order = @po
+            `);
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ message: "No CPO number found for this PO" });
+        }
 
+        res.status(200).json(result.recordset);
+    } catch (error) {
+        console.error("Error in getCPONumber:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
 
 
 // Get defect categories
@@ -238,7 +261,7 @@ const getDefectLocaition = async (req, res) => {
 const addFCAData = async (req, res) => {
     const {
         plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
-        defectDetails, status, defectRate, remarks, type, color, colorDesc
+        defectDetails, status, defectRate, remarks, type, color, colorDesc, cpoNumber,createdBy
     } = req.body;
 
     const pool = await connectDB();
@@ -246,6 +269,15 @@ const addFCAData = async (req, res) => {
 
     try {
         await transaction.begin();
+        await transaction.request()
+        .input('email', sql.NVarChar, createdBy)
+            .query(`
+                IF NOT EXISTS (SELECT 1 FROM Users WHERE Email = @email)
+                BEGIN
+                    INSERT INTO Users (Email, CreatedAt)
+                    VALUES (@email, GETDATE())
+                END
+            `);
 
         // Insert into FCA_Audit table
         const result = await transaction.request()
@@ -264,11 +296,21 @@ const addFCAData = async (req, res) => {
             .input("colorDesc", sql.NVarChar, colorDesc)
             .input("remarks", sql.NVarChar, remarks)
             .input("type", sql.NVarChar, type)
-            .query(`
-                INSERT INTO FCA_Audit (Plant, Module, Shift, PO, Size, Customer, Style, InspectedQuantity, DefectQuantity, Status, DefectRate, Remarks, Type, Customer_Color, Customer_Color_Descr)
-                OUTPUT INSERTED.Id
-                VALUES (@plant, @module, @shift, @po, @size, @customer, @style, @inspectedQuantity, @defectQuantity, @status, @defectRate, @remarks, @type, @color, @colorDesc)
-            `);
+            .input("cpoNumber", sql.NVarChar, cpoNumber)
+            .input("createdBy", sql.NVarChar, createdBy)
+        .query(`
+            INSERT INTO FCA_Audit (
+                Plant, Module, Shift, PO, Size, Customer, Style, 
+                InspectedQuantity, DefectQuantity, Status, DefectRate, 
+                Remarks, Type, Customer_Color, Customer_Color_Descr, CPO_Number,CreatedBy, CreatedAt
+            )
+            OUTPUT INSERTED.Id
+            VALUES (
+                @plant, @module, @shift, @po, @size, @customer, @style,
+                @inspectedQuantity, @defectQuantity, @status, @defectRate,
+                @remarks, @type, @color, @colorDesc, @cpoNumber,@createdBy, GETDATE()
+            )
+        `);
 
         const auditId = result.recordset[0].Id;
 
@@ -327,9 +369,8 @@ const addFCAData = async (req, res) => {
 };
 
 //get all FCA data
-
 const getFCAData = async (req, res) => {
-    const { plant, module, shift, po, size, status, date, page = 1, limit = 10 } = req.query;
+    const { plant, module, shift, po, size, status, type, date, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
     try {
@@ -343,17 +384,19 @@ const getFCAData = async (req, res) => {
             .input("po", sql.NVarChar, po || null)
             .input("size", sql.NVarChar, size || null)
             .input("status", sql.NVarChar, status || null)
+            .input("type", sql.NVarChar, type || null)
             .input("date", sql.Date, date || null)
             .query(`
-                SELECT COUNT(*) AS Total
+                SELECT COUNT(DISTINCT A.Id) AS Total
                 FROM FCA_Audit A
                 WHERE 
                     (@plant IS NULL OR A.Plant = @plant) AND
                     (@module IS NULL OR A.Module = @module) AND
                     (@shift IS NULL OR A.Shift = @shift) AND
-                    (@po IS NULL OR A.PO = @po) AND
+                    (@po IS NULL OR A.PO LIKE '%' + @po + '%') AND
                     (@size IS NULL OR A.Size = @size) AND
                     (@status IS NULL OR A.Status = @status) AND
+                    (@type IS NULL OR A.Type = @type) AND
                     (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date)
             `);
 
@@ -367,31 +410,45 @@ const getFCAData = async (req, res) => {
             .input("po", sql.NVarChar, po || null)
             .input("size", sql.NVarChar, size || null)
             .input("status", sql.NVarChar, status || null)
+            .input("type", sql.NVarChar, type || null)
             .input("date", sql.Date, date || null)
             .input("offset", sql.Int, offset)
             .input("limit", sql.Int, parseInt(limit))
             .query(`
+                WITH OrderedAudits AS (
+                    SELECT A.*,
+                           ROW_NUMBER() OVER (ORDER BY A.Id DESC) as RowNum
+                    FROM FCA_Audit A
+                    WHERE 
+                        (@plant IS NULL OR A.Plant = @plant) AND
+                        (@module IS NULL OR A.Module = @module) AND
+                        (@shift IS NULL OR A.Shift = @shift) AND
+                        (@po IS NULL OR A.PO LIKE '%' + @po + '%') AND
+                        (@size IS NULL OR A.Size = @size) AND
+                        (@status IS NULL OR A.Status = @status) AND
+                        (@type IS NULL OR A.Type = @type) AND
+                        (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date)
+                )
                 SELECT 
-                    A.*, 
-                    D.Id AS DefectId, D.DefectCategory, D.DefectCode
-                FROM FCA_Audit A
+                    A.*,
+                    D.Id AS DefectId,
+                    D.DefectCategory,
+                    D.DefectCode
+                FROM OrderedAudits A
                 LEFT JOIN FCA_Defects D ON A.Id = D.FCA_AuditId
-                WHERE 
-                    (@plant IS NULL OR A.Plant = @plant) AND
-                    (@module IS NULL OR A.Module = @module) AND
-                    (@shift IS NULL OR A.Shift = @shift) AND
-                    (@po IS NULL OR A.PO = @po) AND
-                    (@size IS NULL OR A.Size = @size) AND
-                    (@status IS NULL OR A.Status = @status) AND
-                    (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date)
-                ORDER BY A.Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
+                WHERE A.RowNum > @offset AND A.RowNum <= (@offset + @limit)
+                ORDER BY A.Id DESC;
             `);
 
         const groupedResults = dataResult.recordset.reduce((acc, row) => {
             if (!acc[row.Id]) {
-                acc[row.Id] = { ...row, defects: [] };
+                const {
+                    DefectId, DefectCategory, DefectCode, RowNum,
+                    ...auditData
+                } = row;
+                acc[row.Id] = { ...auditData, defects: [] };
             }
-            if (row.DefectCategory && row.DefectCode) {
+            if (row.DefectId) {
                 acc[row.Id].defects.push({
                     defectId: row.DefectId,
                     defectCategory: row.DefectCategory,
@@ -401,13 +458,18 @@ const getFCAData = async (req, res) => {
             return acc;
         }, {});
 
-        res.status(200).json({ total, data: Object.values(groupedResults) });
+        // Convert to array and ensure DESC order by Id
+        const sortedData = Object.values(groupedResults).sort((a, b) => b.Id - a.Id);
+
+        res.status(200).json({ 
+            total, 
+            data: sortedData
+        });
     } catch (error) {
+        console.error("Error in getFCAData:", error);
         res.status(500).json({ error: error.message });
     }
 };
-
-
 
 
 // Update FCA data
@@ -492,17 +554,47 @@ const deleteFCAData = async (req, res) => {
     const { id } = req.params;
 
     const pool = await connectDB();
-    const transaction = pool.transaction();
+    const transaction = await pool.transaction();
 
     try {
         await transaction.begin();
 
-        // Delete defects associated with the audit
+        // First check if the record exists
+        const checkResult = await transaction.request()
+            .input("id", sql.Int, id)
+            .query("SELECT Id FROM FCA_Audit WHERE Id = @id");
+
+        if (checkResult.recordset.length === 0) {
+            await transaction.rollback();
+            return res.status(404).json({ error: "Record not found" });
+        }
+
+        // First, get all defect IDs associated with this audit
+        const defectResult = await transaction.request()
+            .input("id", sql.Int, id)
+            .query("SELECT Id FROM FCA_Defects WHERE FCA_AuditId = @id");
+
+        // If there are defects, delete their photos first
+        if (defectResult.recordset.length > 0) {
+            const defectIds = defectResult.recordset.map(d => d.Id);
+            
+            // Delete photos for all defects
+            await transaction.request()
+                .input("auditId", sql.Int, id)
+                .query(`
+                    DELETE FROM FCA_DefPhoto 
+                    WHERE FCA_DefectId IN (
+                        SELECT Id FROM FCA_Defects WHERE FCA_AuditId = @auditId
+                    )
+                `);
+        }
+
+        // Now delete the defects
         await transaction.request()
             .input("id", sql.Int, id)
             .query("DELETE FROM FCA_Defects WHERE FCA_AuditId = @id");
 
-        // Delete the audit
+        // Finally delete the audit
         await transaction.request()
             .input("id", sql.Int, id)
             .query("DELETE FROM FCA_Audit WHERE Id = @id");
@@ -510,13 +602,105 @@ const deleteFCAData = async (req, res) => {
         await transaction.commit();
         res.status(200).json({ message: "FCA data deleted successfully." });
     } catch (error) {
-        await transaction.rollback();
-        res.status(500).json({ error: error.message });
+        console.error("Error in deleteFCAData:", error);
+        if (transaction) {
+            try {
+                await transaction.rollback();
+            } catch (rollbackError) {
+                console.error("Error rolling back transaction:", rollbackError);
+            }
+        }
+        res.status(500).json({ 
+            error: "Failed to delete FCA data", 
+            details: error.message 
+        });
     }
 };
+// const generateFailureReport = async (req, res) => {
+//     const { auditId } = req.params;
+    
+//     try {
+//         const pool = await connectDB();
+        
+//         // Get main audit data
+//         const auditResult = await pool.request()
+//             .input('auditId', sql.Int, auditId)
+//             .query(`
+//                 SELECT 
+//                     A.*,
+//                     CONVERT(varchar, A.SubmissionDate, 120) as FormattedSubmissionDate
+//                 FROM FCA_Audit A
+//                 WHERE A.Id = @auditId
+//             `);
+
+//         if (auditResult.recordset.length === 0) {
+//             return res.status(404).json({ message: "Audit record not found" });
+//         }
+
+//         const auditData = auditResult.recordset[0];
+
+//         // Get defects with their photos
+//         const defectsResult = await pool.request()
+//             .input('auditId', sql.Int, auditId)
+//             .query(`
+//                 SELECT 
+//                     D.Id AS DefectId,
+//                     D.DefectCategory,
+//                     D.DefectCode,
+//                     D.Quantity,
+//                     D.LocationCategory,
+//                     D.DefectLocation,
+//                     P.Id AS PhotoId,
+//                     P.PhotoData,
+//                     P.PhotoMimeType,
+//                     P.PhotoName
+//                 FROM FCA_Defects D
+//                 LEFT JOIN FCA_DefPhoto P ON D.Id = P.FCA_DefectId
+//                 WHERE D.FCA_AuditId = @auditId
+//                 ORDER BY D.Id, P.Id
+//             `);
+
+//         // Process defects and their photos
+//         const defectMap = new Map();
+//         defectsResult.recordset.forEach(record => {
+//             if (!defectMap.has(record.DefectId)) {
+//                 defectMap.set(record.DefectId, {
+//                     defectId: record.DefectId,
+//                     defectCategory: record.DefectCategory,
+//                     defectCode: record.DefectCode,
+//                     quantity: record.Quantity,
+//                     locationCategory: record.LocationCategory,
+//                     defectLocation: record.DefectLocation,
+//                     photos: []
+//                 });
+//             }
+            
+//             if (record.PhotoId) {
+//                 const photoData = record.PhotoData;
+//                 if (photoData) {
+//                     const base64Photo = Buffer.from(photoData).toString('base64');
+//                     defectMap.get(record.DefectId).photos.push({
+//                         id: record.PhotoId,
+//                         name: record.PhotoName,
+//                         data: `data:${record.PhotoMimeType};base64,${base64Photo}`
+//                     });
+//                 }
+//             }
+//         });
+
+//         const reportData = {
+//             ...auditData,
+//             defectEntries: Array.from(defectMap.values())
+//         };
+
+//         res.status(200).json(reportData);
+//     } catch (error) {
+//         console.error("Error generating failure report:", error);
+//         res.status(500).json({ error: error.message });
+//     }
+// };
 
 
 
 
-
-module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles, getDefectLocaition, getLocationCategory,getCustomerColor,getCustomerColorDesc,getCustomerColorDesc };
+module.exports = { getPlants, getPOs, getSizes, getDefectCategories, getDefectCodes, addFCAData,getModules,getFCAData, updateFCAData, deleteFCAData, getCustomers, getStyles, getDefectLocaition, getLocationCategory,getCustomerColor,getCustomerColorDesc,getCustomerColorDesc,getCPONumber };
