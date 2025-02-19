@@ -30,19 +30,18 @@ const getModules = async (req, res) => {
 
 // Get POs for a selected plant and module
 const getPOs = async (req, res) => {
-    const { module } = req.params;
+    const { plant } = req.params;
     try {
         const pool = await connectDB();
         const result = await pool
             .request()
-            .input("module", sql.NVarChar, module)
-            .query("SELECT DISTINCT Sewing_Order FROM PoData WHERE Sewing_work_center = @module");
+            .input("plant", sql.NVarChar, plant)
+            .query("SELECT DISTINCT Sewing_Order FROM PoData WHERE Production_Section = @plant");
         res.status(200).json(result.recordset);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
-
 
 // Get sizes for a selected PO
 const getSizes = async (req, res) => {
@@ -257,11 +256,11 @@ const getDefectLocaition = async (req, res) => {
 
 
 // Submit FCA data
-// In the second document where addFCAData is defined
+
 const addFCAData = async (req, res) => {
     const {
         plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
-        defectDetails, status, defectRate, remarks, type, color, colorDesc, cpoNumber,createdBy
+        defectDetails, status, defectRate, remarks, type, color, colorDesc, cpoNumber, createdBy
     } = req.body;
 
     const pool = await connectDB();
@@ -269,17 +268,20 @@ const addFCAData = async (req, res) => {
 
     try {
         await transaction.begin();
-        await transaction.request()
-        .input('email', sql.NVarChar, createdBy)
+        
+        // Insert into Users table with proper error handling
+        const userResult = await transaction.request()
+            .input('email', sql.NVarChar, createdBy)
             .query(`
-                IF NOT EXISTS (SELECT 1 FROM Users WHERE Email = @email)
-                BEGIN
-                    INSERT INTO Users (Email, CreatedAt)
-                    VALUES (@email, GETDATE())
-                END
+                MERGE INTO Users AS target
+                USING (VALUES (@email)) AS source (Email)
+                ON target.Email = source.Email
+                WHEN NOT MATCHED THEN
+                    INSERT (Email, CreatedAt)
+                    VALUES (@email, GETDATE());
             `);
 
-        // Insert into FCA_Audit table
+        // Insert into FCA_Audit table with CreatedBy
         const result = await transaction.request()
             .input("plant", sql.NVarChar, plant)
             .input("module", sql.NVarChar, module)
@@ -298,19 +300,19 @@ const addFCAData = async (req, res) => {
             .input("type", sql.NVarChar, type)
             .input("cpoNumber", sql.NVarChar, cpoNumber)
             .input("createdBy", sql.NVarChar, createdBy)
-        .query(`
-            INSERT INTO FCA_Audit (
-                Plant, Module, Shift, PO, Size, Customer, Style, 
-                InspectedQuantity, DefectQuantity, Status, DefectRate, 
-                Remarks, Type, Customer_Color, Customer_Color_Descr, CPO_Number,CreatedBy, CreatedAt
-            )
-            OUTPUT INSERTED.Id
-            VALUES (
-                @plant, @module, @shift, @po, @size, @customer, @style,
-                @inspectedQuantity, @defectQuantity, @status, @defectRate,
-                @remarks, @type, @color, @colorDesc, @cpoNumber,@createdBy, GETDATE()
-            )
-        `);
+            .query(`
+                INSERT INTO FCA_Audit (
+                    Plant, Module, Shift, PO, Size, Customer, Style, 
+                    InspectedQuantity, DefectQuantity, Status, DefectRate, 
+                    Remarks, Type, Customer_Color, Customer_Color_Descr, CPO_Number, CreatedBy, CreatedAt
+                )
+                OUTPUT INSERTED.Id
+                VALUES (
+                    @plant, @module, @shift, @po, @size, @customer, @style,
+                    @inspectedQuantity, @defectQuantity, @status, @defectRate,
+                    @remarks, @type, @color, @colorDesc, @cpoNumber, @createdBy, GETDATE()
+                )
+            `);
 
         const auditId = result.recordset[0].Id;
 
