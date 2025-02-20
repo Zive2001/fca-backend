@@ -25,7 +25,7 @@ const router = express.Router();
 // Existing routes
 router.get("/plants", getPlants);
 router.get("/modules/:plant", getModules);            
-router.get("/pos/:plant", getPOs);        
+router.get("/pos", getPOs);        
 router.get("/sizes/:po", getSizes);         
 router.get("/customers/:po", getCustomers);         
 router.get("/styles/:po", getStyles);   

@@ -28,15 +28,13 @@ const getModules = async (req, res) => {
     }
 };
 
-// Get POs for a selected plant and module
+// Get POs
 const getPOs = async (req, res) => {
-    const { plant } = req.params;
     try {
         const pool = await connectDB();
         const result = await pool
             .request()
-            .input("plant", sql.NVarChar, plant)
-            .query("SELECT DISTINCT Sewing_Order FROM PoData WHERE Production_Section = @plant");
+            .query("SELECT DISTINCT Sewing_Order FROM PoData ORDER BY Sewing_Order DESC");
         res.status(200).json(result.recordset);
     } catch (error) {
         res.status(500).json({ error: error.message });
