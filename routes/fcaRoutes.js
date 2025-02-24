@@ -16,7 +16,8 @@ const {
     getLocationCategory, 
     getCustomerColor, 
     getCustomerColorDesc,
-    getCPONumber,         
+    getCPONumber,
+    getDashboardAnalytics      
   
 } = require("../controllers/fcaController");
 
@@ -35,6 +36,7 @@ router.get("/defect-categories", getDefectCategories);
 router.get("/defect-codes/:category", getDefectCodes); 
 router.get("/location-categories", getLocationCategory);
 router.get("/defect-locations/:category", getDefectLocaition);
+
 
 
 // Add new route for CPO number

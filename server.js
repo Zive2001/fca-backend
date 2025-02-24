@@ -8,6 +8,7 @@ const uploadRoutes = require("./routes/uploadroutes");
 const photoRoutes = require("./routes/photoRoutes");
 const emailRoutes = require("./routes/emailRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 const dotenv = require("dotenv");
 const { connectDB } = require("./db/dbConfig");
 
@@ -73,7 +74,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/fca/photos", photoRoutes);
 app.use("/api/fca/email", emailRoutes);
 app.use("/api/fca/reports", reportRoutes);
-
+app.use("/api/fca/analytics", dashboardRoutes);
 
 // Basic route for testing
 app.get("/", (req, res) => {
