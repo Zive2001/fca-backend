@@ -1,4 +1,3 @@
-//server.js
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -9,6 +8,7 @@ const photoRoutes = require("./routes/photoRoutes");
 const emailRoutes = require("./routes/emailRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const adminRoutes = require("./routes/adminRoutes"); // Add this line
 const dotenv = require("dotenv");
 const { connectDB } = require("./db/dbConfig");
 
@@ -41,7 +41,8 @@ const corsOptions = {
         'Cache-Control',
         'Pragma',
         'Accept',
-        'Origin'
+        'Origin',
+        'x-ms-client-principal-name' // Add this for Azure AD authentication
     ],
     exposedHeaders: ['Content-Disposition']
 };
@@ -54,7 +55,7 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', req.headers.origin);
     res.header('Access-Control-Allow-Credentials', true);
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, x-ms-client-principal-name');
     
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
@@ -68,6 +69,18 @@ app.use((req, res, next) => {
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
+// Azure AD authentication middleware
+app.use((req, res, next) => {
+    // Extract Azure AD user information if available
+    const azureUser = req.headers['x-ms-client-principal-name'];
+    if (azureUser) {
+        req.user = {
+            email: azureUser
+        };
+    }
+    next();
+});
+
 // Routes
 app.use("/api/fca", fcaRoutes);
 app.use("/api/upload", uploadRoutes);
@@ -75,6 +88,7 @@ app.use("/api/fca/photos", photoRoutes);
 app.use("/api/fca/email", emailRoutes);
 app.use("/api/fca/reports", reportRoutes);
 app.use("/api/fca/analytics", dashboardRoutes);
+app.use("/api/fca/admin", adminRoutes); // Add admin routes
 
 // Basic route for testing
 app.get("/", (req, res) => {
@@ -102,6 +116,14 @@ app.use((err, req, res, next) => {
         query: req.query,
         headers: req.headers,
     });
+
+    // Special handling for admin-related errors
+    if (err.name === 'AdminAuthorizationError') {
+        return res.status(403).json({
+            error: 'Admin access required',
+            timestamp: new Date().toISOString()
+        });
+    }
 
     res.status(500).json({ 
         error: err.message || 'Something broke!',
