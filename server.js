@@ -38,11 +38,12 @@ const corsOptions = {
         'Content-Type', 
         'Authorization', 
         'X-Requested-With',
+        'X-MS-CLIENT-PRINCIPAL-NAME',
+        'X-MS-CLIENT-PRINCIPAL-ID',
         'Cache-Control',
         'Pragma',
         'Accept',
-        'Origin',
-        'x-ms-client-principal-name' // Add this for Azure AD authentication
+        'Origin' 
     ],
     exposedHeaders: ['Content-Disposition']
 };

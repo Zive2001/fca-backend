@@ -1,3 +1,5 @@
+//adminController.js
+
 const { connectDB, sql } = require("../db/dbConfig");
 
 // Check if a user is an admin
