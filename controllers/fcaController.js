@@ -258,7 +258,7 @@ const getDefectLocaition = async (req, res) => {
 const addFCAData = async (req, res) => {
     const {
         plant, module, shift, po, size, customer, style, inspectedQuantity, defectQuantity,
-        defectDetails, status, defectRate, remarks, type, color, colorDesc, cpoNumber, createdBy
+        defectDetails, status, defectRate, remarks, type, color, colorDesc, cpoNumber, createdBy,isThirdParty
     } = req.body;
 
     const pool = await connectDB();
@@ -298,17 +298,18 @@ const addFCAData = async (req, res) => {
             .input("type", sql.NVarChar, type)
             .input("cpoNumber", sql.NVarChar, cpoNumber)
             .input("createdBy", sql.NVarChar, createdBy)
+            .input("isThirdParty", sql.Bit, isThirdParty ? 1 : 0) 
             .query(`
                 INSERT INTO FCA_Audit (
                     Plant, Module, Shift, PO, Size, Customer, Style, 
                     InspectedQuantity, DefectQuantity, Status, DefectRate, 
-                    Remarks, Type, Customer_Color, Customer_Color_Descr, CPO_Number, CreatedBy, CreatedAt
+                    Remarks, Type, Customer_Color, Customer_Color_Descr, CPO_Number, CreatedBy, CreatedAt,IsThirdParty
                 )
                 OUTPUT INSERTED.Id
                 VALUES (
                     @plant, @module, @shift, @po, @size, @customer, @style,
                     @inspectedQuantity, @defectQuantity, @status, @defectRate,
-                    @remarks, @type, @color, @colorDesc, @cpoNumber, @createdBy, GETDATE()
+                    @remarks, @type, @color, @colorDesc, @cpoNumber, @createdBy, GETDATE(),@isThirdParty
                 )
             `);
 
@@ -370,13 +371,13 @@ const addFCAData = async (req, res) => {
 
 //get all FCA data
 const getFCAData = async (req, res) => {
-    const { plant, module, shift, po, size, status, type, date, page = 1, limit = 10 } = req.query;
+    const { plant, module, shift, po, size, status, type, date, isThirdParty, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
     try {
         const pool = await connectDB();
 
-        // Total count query for pagination
+        // Total count query for pagination, including isThirdParty filter if provided
         const totalResult = await pool.request()
             .input("plant", sql.NVarChar, plant || null)
             .input("module", sql.NVarChar, module || null)
@@ -386,6 +387,7 @@ const getFCAData = async (req, res) => {
             .input("status", sql.NVarChar, status || null)
             .input("type", sql.NVarChar, type || null)
             .input("date", sql.Date, date || null)
+            .input("isThirdParty", sql.Bit, isThirdParty !== undefined ? (isThirdParty ? 1 : 0) : null)
             .query(`
                 SELECT COUNT(DISTINCT A.Id) AS Total
                 FROM FCA_Audit A
@@ -397,7 +399,8 @@ const getFCAData = async (req, res) => {
                     (@size IS NULL OR A.Size = @size) AND
                     (@status IS NULL OR A.Status = @status) AND
                     (@type IS NULL OR A.Type = @type) AND
-                    (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date)
+                    (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date) AND
+                    (@isThirdParty IS NULL OR A.IsThirdParty = @isThirdParty)
             `);
 
         const total = totalResult.recordset[0].Total;
