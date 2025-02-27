@@ -370,14 +370,21 @@ const addFCAData = async (req, res) => {
 };
 
 //get all FCA data
+// Updated getFCAData controller to handle new filter parameters
 const getFCAData = async (req, res) => {
-    const { plant, module, shift, po, size, status, type, date, isThirdParty, page = 1, limit = 10 } = req.query;
+    const { 
+        plant, module, shift, po, size, status, type, date, 
+        isThirdParty, page = 1, limit = 10,
+        id,        // New parameter for ID filtering
+        customer   // New parameter for customer filtering
+    } = req.query;
+    
     const offset = (page - 1) * limit;
 
     try {
         const pool = await connectDB();
 
-        // Total count query for pagination, including isThirdParty filter if provided
+        // Total count query for pagination with new filters
         const totalResult = await pool.request()
             .input("plant", sql.NVarChar, plant || null)
             .input("module", sql.NVarChar, module || null)
@@ -387,7 +394,10 @@ const getFCAData = async (req, res) => {
             .input("status", sql.NVarChar, status || null)
             .input("type", sql.NVarChar, type || null)
             .input("date", sql.Date, date || null)
-            .input("isThirdParty", sql.Bit, isThirdParty !== undefined ? (isThirdParty ? 1 : 0) : null)
+            .input("isThirdParty", sql.Bit, isThirdParty !== undefined ? 
+                (isThirdParty === "true" ? 1 : isThirdParty === "false" ? 0 : null) : null)
+            .input("id", sql.Int, id ? parseInt(id) : null)
+            .input("customer", sql.NVarChar, customer || null)
             .query(`
                 SELECT COUNT(DISTINCT A.Id) AS Total
                 FROM FCA_Audit A
@@ -400,12 +410,14 @@ const getFCAData = async (req, res) => {
                     (@status IS NULL OR A.Status = @status) AND
                     (@type IS NULL OR A.Type = @type) AND
                     (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date) AND
-                    (@isThirdParty IS NULL OR A.IsThirdParty = @isThirdParty)
+                    (@isThirdParty IS NULL OR A.IsThirdParty = @isThirdParty) AND
+                    (@id IS NULL OR A.Id = @id) AND
+                    (@customer IS NULL OR A.Customer = @customer)
             `);
 
         const total = totalResult.recordset[0].Total;
 
-        // Fetch paginated data
+        // Fetch paginated data with new filters
         const dataResult = await pool.request()
             .input("plant", sql.NVarChar, plant || null)
             .input("module", sql.NVarChar, module || null)
@@ -415,6 +427,10 @@ const getFCAData = async (req, res) => {
             .input("status", sql.NVarChar, status || null)
             .input("type", sql.NVarChar, type || null)
             .input("date", sql.Date, date || null)
+            .input("isThirdParty", sql.Bit, isThirdParty !== undefined ? 
+                (isThirdParty === "true" ? 1 : isThirdParty === "false" ? 0 : null) : null)
+            .input("id", sql.Int, id ? parseInt(id) : null)
+            .input("customer", sql.NVarChar, customer || null)
             .input("offset", sql.Int, offset)
             .input("limit", sql.Int, parseInt(limit))
             .query(`
@@ -430,7 +446,10 @@ const getFCAData = async (req, res) => {
                         (@size IS NULL OR A.Size = @size) AND
                         (@status IS NULL OR A.Status = @status) AND
                         (@type IS NULL OR A.Type = @type) AND
-                        (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date)
+                        (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date) AND
+                        (@isThirdParty IS NULL OR A.IsThirdParty = @isThirdParty) AND
+                        (@id IS NULL OR A.Id = @id) AND
+                        (@customer IS NULL OR A.Customer = @customer)
                 )
                 SELECT 
                     A.*,
@@ -443,6 +462,7 @@ const getFCAData = async (req, res) => {
                 ORDER BY A.Id DESC;
             `);
 
+        // Rest of the function remains the same...
         const groupedResults = dataResult.recordset.reduce((acc, row) => {
             if (!acc[row.Id]) {
                 const {
@@ -473,7 +493,6 @@ const getFCAData = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
-
 
 // Update FCA data
 const updateFCAData = async (req, res) => {
