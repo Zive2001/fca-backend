@@ -370,13 +370,12 @@ const addFCAData = async (req, res) => {
 };
 
 //get all FCA data
-// Updated getFCAData controller to handle new filter parameters
+// Updated getFCAData controller to handle CPO number and style filters
 const getFCAData = async (req, res) => {
     const { 
-        plant, module, shift, po, size, status, type, date, 
+        plant, module, shift, po, cpoNumber, style, size, status, type, date, 
         isThirdParty, page = 1, limit = 10,
-        id,        // New parameter for ID filtering
-        customer   // New parameter for customer filtering
+        id, customer
     } = req.query;
     
     const offset = (page - 1) * limit;
@@ -390,6 +389,8 @@ const getFCAData = async (req, res) => {
             .input("module", sql.NVarChar, module || null)
             .input("shift", sql.NVarChar, shift || null)
             .input("po", sql.NVarChar, po || null)
+            .input("cpoNumber", sql.NVarChar, cpoNumber || null)
+            .input("style", sql.NVarChar, style || null) // Add Style parameter
             .input("size", sql.NVarChar, size || null)
             .input("status", sql.NVarChar, status || null)
             .input("type", sql.NVarChar, type || null)
@@ -406,13 +407,15 @@ const getFCAData = async (req, res) => {
                     (@module IS NULL OR A.Module = @module) AND
                     (@shift IS NULL OR A.Shift = @shift) AND
                     (@po IS NULL OR A.PO LIKE '%' + @po + '%') AND
+                    (@cpoNumber IS NULL OR A.CPO_Number LIKE '%' + @cpoNumber + '%') AND
+                    (@style IS NULL OR A.Style LIKE '%' + @style + '%') AND
                     (@size IS NULL OR A.Size = @size) AND
                     (@status IS NULL OR A.Status = @status) AND
                     (@type IS NULL OR A.Type = @type) AND
                     (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date) AND
                     (@isThirdParty IS NULL OR A.IsThirdParty = @isThirdParty) AND
                     (@id IS NULL OR A.Id = @id) AND
-                    (@customer IS NULL OR A.Customer = @customer)
+                    (@customer IS NULL OR A.Customer LIKE '%' + @customer + '%')
             `);
 
         const total = totalResult.recordset[0].Total;
@@ -423,6 +426,8 @@ const getFCAData = async (req, res) => {
             .input("module", sql.NVarChar, module || null)
             .input("shift", sql.NVarChar, shift || null)
             .input("po", sql.NVarChar, po || null)
+            .input("cpoNumber", sql.NVarChar, cpoNumber || null)
+            .input("style", sql.NVarChar, style || null) // Add Style parameter
             .input("size", sql.NVarChar, size || null)
             .input("status", sql.NVarChar, status || null)
             .input("type", sql.NVarChar, type || null)
@@ -443,13 +448,15 @@ const getFCAData = async (req, res) => {
                         (@module IS NULL OR A.Module = @module) AND
                         (@shift IS NULL OR A.Shift = @shift) AND
                         (@po IS NULL OR A.PO LIKE '%' + @po + '%') AND
+                        (@cpoNumber IS NULL OR A.CPO_Number LIKE '%' + @cpoNumber + '%') AND
+                        (@style IS NULL OR A.Style LIKE '%' + @style + '%') AND
                         (@size IS NULL OR A.Size = @size) AND
                         (@status IS NULL OR A.Status = @status) AND
                         (@type IS NULL OR A.Type = @type) AND
                         (@date IS NULL OR CONVERT(date, A.SubmissionDate) = @date) AND
                         (@isThirdParty IS NULL OR A.IsThirdParty = @isThirdParty) AND
                         (@id IS NULL OR A.Id = @id) AND
-                        (@customer IS NULL OR A.Customer = @customer)
+                        (@customer IS NULL OR A.Customer LIKE '%' + @customer + '%')
                 )
                 SELECT 
                     A.*,
@@ -462,7 +469,7 @@ const getFCAData = async (req, res) => {
                 ORDER BY A.Id DESC;
             `);
 
-        // Rest of the function remains the same...
+        // Group results by audit ID
         const groupedResults = dataResult.recordset.reduce((acc, row) => {
             if (!acc[row.Id]) {
                 const {
@@ -493,7 +500,6 @@ const getFCAData = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
-
 // Update FCA data
 const updateFCAData = async (req, res) => {
     const { id } = req.params; // Record ID to update
